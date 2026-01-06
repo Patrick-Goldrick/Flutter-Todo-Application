@@ -1,0 +1,355 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+/* =======================
+   APP ROOT (STATEFUL)
+======================= */
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _darkMode = false;
+
+  void _toggleDarkMode(bool value) {
+    setState(() {
+      _darkMode = value;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'To-Do Tracker',
+      theme: ThemeData.light(),
+      darkTheme: ThemeData.dark(),
+      themeMode: _darkMode ? ThemeMode.dark : ThemeMode.light,
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const StartScreen(),
+        '/todos': (context) => const TodoPage(),
+        '/howto': (context) => const HowToScreen(),
+        '/settings': (context) =>
+            SettingsScreen(darkMode: _darkMode, onToggle: _toggleDarkMode),
+      },
+    );
+  }
+}
+
+/* =======================
+   START SCREEN
+======================= */
+
+class StartScreen extends StatelessWidget {
+  const StartScreen({super.key});
+
+  Widget _menuButton(BuildContext context, String text, String route) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: SizedBox(
+        width: 220,
+        child: ElevatedButton(
+          onPressed: () => Navigator.pushNamed(context, route),
+          child: Text(text),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle_outline, size: 100),
+            const SizedBox(height: 20),
+            const Text(
+              'To-Do Tracker',
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 40),
+            _menuButton(context, 'Start', '/todos'),
+            _menuButton(context, 'How To Use', '/howto'),
+            _menuButton(context, 'Settings', '/settings'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/* =======================
+   HOW TO SCREEN
+======================= */
+
+class HowToScreen extends StatelessWidget {
+  const HowToScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('How To Use')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'Using the To-Do Tracker',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+            Text('• Tap the + button to add a new task'),
+            Text('• Choose a category and priority'),
+            Text('• Tap a task to edit it'),
+            Text('• Long-press a task to delete it'),
+            Text('• Use the checkbox to mark tasks complete'),
+            Text('• Use the broom icon to clear completed tasks'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/* =======================
+   SETTINGS SCREEN
+======================= */
+
+class SettingsScreen extends StatelessWidget {
+  final bool darkMode;
+  final Function(bool) onToggle;
+
+  const SettingsScreen({
+    super.key,
+    required this.darkMode,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Settings')),
+      body: ListView(
+        children: [
+          SwitchListTile(
+            title: const Text('Dark Mode'),
+            value: darkMode,
+            onChanged: onToggle,
+            secondary: const Icon(Icons.dark_mode),
+          ),
+          const ListTile(
+            leading: Icon(Icons.info),
+            title: Text('App Version'),
+            subtitle: Text('1.0.0'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/* =======================
+   DATA MODEL
+======================= */
+
+enum Priority { low, medium, high }
+
+class Todo {
+  String title;
+  String description;
+  bool isDone;
+  String category;
+  Priority priority;
+
+  Todo({
+    required this.title,
+    this.description = '',
+    this.isDone = false,
+    required this.category,
+    required this.priority,
+  });
+}
+
+/* =======================
+   TODO PAGE
+======================= */
+
+class TodoPage extends StatefulWidget {
+  const TodoPage({super.key});
+
+  @override
+  State<TodoPage> createState() => _TodoPageState();
+}
+
+class _TodoPageState extends State<TodoPage> {
+  final List<Todo> _todos = [];
+
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descController = TextEditingController();
+
+  String _selectedCategory = 'Study';
+  Priority _selectedPriority = Priority.medium;
+
+  List<Todo> _tasksFor(String c) =>
+      _todos.where((t) => t.category == c).toList();
+
+  Color _priorityColor(Priority p) {
+    switch (p) {
+      case Priority.high:
+        return Colors.red;
+      case Priority.medium:
+        return Colors.orange;
+      case Priority.low:
+        return Colors.green;
+    }
+  }
+
+  void _showTaskDialog({Todo? todo}) {
+    final editing = todo != null;
+
+    if (editing) {
+      _titleController.text = todo.title;
+      _descController.text = todo.description;
+      _selectedCategory = todo.category;
+      _selectedPriority = todo.priority;
+    } else {
+      _titleController.clear();
+      _descController.clear();
+      _selectedCategory = 'Study';
+      _selectedPriority = Priority.medium;
+    }
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(editing ? 'Edit Task' : 'Add Task'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration:
+                  const InputDecoration(labelText: 'Task title'),
+            ),
+            TextField(
+              controller: _descController,
+              maxLines: 3,
+              decoration:
+                  const InputDecoration(labelText: 'Description'),
+            ),
+            DropdownButton<String>(
+              value: _selectedCategory,
+              isExpanded: true,
+              items: ['Work', 'Study', 'Personal']
+                  .map((c) =>
+                      DropdownMenuItem(value: c, child: Text(c)))
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedCategory = v!),
+            ),
+            DropdownButton<Priority>(
+              value: _selectedPriority,
+              isExpanded: true,
+              items: Priority.values
+                  .map((p) => DropdownMenuItem(
+                        value: p,
+                        child: Text(p.name.toUpperCase()),
+                      ))
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedPriority = v!),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              if (_titleController.text.isEmpty) return;
+
+              setState(() {
+                if (editing) {
+                  todo.title = _titleController.text;
+                  todo.description = _descController.text;
+                  todo.category = _selectedCategory;
+                  todo.priority = _selectedPriority;
+                } else {
+                  _todos.add(Todo(
+                    title: _titleController.text,
+                    description: _descController.text,
+                    category: _selectedCategory,
+                    priority: _selectedPriority,
+                  ));
+                }
+              });
+
+              Navigator.pop(context);
+            },
+            child: Text(editing ? 'Save' : 'Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Your Tasks')),
+      body: ListView(
+        children: ['Work', 'Study', 'Personal']
+            .where((c) => _tasksFor(c).isNotEmpty)
+            .map(
+              (c) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      c.toUpperCase(),
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  ..._tasksFor(c).map(
+                    (t) => Card(
+                      child: ListTile(
+                        leading: Icon(Icons.circle,
+                            size: 12,
+                            color: _priorityColor(t.priority)),
+                        title: Text(t.title),
+                        subtitle: t.description.isNotEmpty
+                            ? Text(t.description)
+                            : null,
+                        trailing: Checkbox(
+                          value: t.isDone,
+                          onChanged: (v) =>
+                              setState(() => t.isDone = v!),
+                        ),
+                        onTap: () => _showTaskDialog(todo: t),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+            .toList(),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showTaskDialog(),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
