@@ -1,1 +1,497 @@
+import 'package:flutter/material.dart';
+
+// Entry point of the Flutter app
+void main() {
+  runApp(const MyApp());
+}
+
+/* =======================
+   APP ROOT (Stateful for Dark Mode)
+======================= */
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  // Boolean to track dark mode state
+  bool _darkMode = false;
+
+  // Toggle function to switch between light and dark themes
+  void _toggleDarkMode(bool value) {
+    setState(() {
+      _darkMode = value;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'To-Do Tracker',
+      // Light theme
+      theme: ThemeData.light(),
+      // Dark theme
+      darkTheme: ThemeData.dark(),
+      // Apply theme based on _darkMode
+      themeMode: _darkMode ? ThemeMode.dark : ThemeMode.light,
+      // Start the app at the login screen
+      initialRoute: '/login',
+      // Define all routes/screens
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/': (context) => const StartScreen(),
+        '/todos': (context) => const TodoPage(),
+        '/howto': (context) => const HowToScreen(),
+        '/settings': (context) =>
+            SettingsScreen(darkMode: _darkMode, onToggle: _toggleDarkMode),
+      },
+    );
+  }
+}
+
+/* =======================
+   LOGIN SCREEN
+======================= */
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  // Controllers to capture username and password
+  final _userController = TextEditingController();
+  final _passController = TextEditingController();
+  String _error = ''; // Error message for invalid login
+
+  // Mock login function (no backend)
+  void _login() {
+    if (_userController.text == 'admin' &&
+        _passController.text == '1234') {
+      // Navigate to Start Screen on success
+      Navigator.pushReplacementNamed(context, '/');
+    } else {
+      // Display error on invalid credentials
+      setState(() {
+        _error = 'Invalid login credentials';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      // Center login form
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline, size: 80),
+              const SizedBox(height: 20),
+              const Text(
+                'Login',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 30),
+              // Username input
+              TextField(
+                controller: _userController,
+                decoration: const InputDecoration(labelText: 'Username'),
+              ),
+              // Password input
+              TextField(
+                controller: _passController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Password'),
+              ),
+              const SizedBox(height: 20),
+              // Display error message if login fails
+              if (_error.isNotEmpty)
+                Text(_error, style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 20),
+              // Login button
+              ElevatedButton(
+                onPressed: _login,
+                child: const Text('Login'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/* =======================
+   START SCREEN (Main Menu)
+======================= */
+class StartScreen extends StatelessWidget {
+  const StartScreen({super.key});
+
+  // Helper to create menu buttons
+  Widget _menuButton(BuildContext context, String text, String route) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: SizedBox(
+        width: 220,
+        child: ElevatedButton(
+          onPressed: () => Navigator.pushNamed(context, route),
+          child: Text(text),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      // AppBar with Logout button
+      appBar: AppBar(
+        title: const Text('Main Menu'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () =>
+                Navigator.pushReplacementNamed(context, '/login'),
+          )
+        ],
+      ),
+      // Menu layout
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle_outline, size: 100),
+            const SizedBox(height: 20),
+            const Text(
+              'To-Do Tracker',
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 40),
+            _menuButton(context, 'Start', '/todos'),
+            _menuButton(context, 'How To Use', '/howto'),
+            _menuButton(context, 'Settings', '/settings'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/* =======================
+   HOW TO SCREEN
+======================= */
+class HowToScreen extends StatelessWidget {
+  const HowToScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('How To Use')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'Using the To-Do Tracker',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+            Text('• Add tasks using the + button'),
+            Text('• Tap a task to edit it'),
+            Text('• Long-press a task to delete it'),
+            Text('• Use settings to enable dark mode'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/* =======================
+   SETTINGS SCREEN
+======================= */
+class SettingsScreen extends StatelessWidget {
+  final bool darkMode; // Current dark mode state
+  final Function(bool) onToggle; // Callback to toggle theme
+
+  const SettingsScreen({
+    super.key,
+    required this.darkMode,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Settings')),
+      body: ListView(
+        children: [
+          // Dark mode toggle
+          SwitchListTile(
+            title: const Text('Dark Mode'),
+            value: darkMode,
+            onChanged: onToggle,
+            secondary: const Icon(Icons.dark_mode),
+          ),
+          // Static info example
+          const ListTile(
+            leading: Icon(Icons.info),
+            title: Text('App Version'),
+            subtitle: Text('1.0.0'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/* =======================
+   DATA MODEL
+======================= */
+enum Priority { low, medium, high }
+
+class Todo {
+  String title; // Task title
+  String description; // Optional description
+  bool isDone; // Completion status
+  String category; // Work, Study, Personal
+  Priority priority; // Task priority
+
+  Todo({
+    required this.title,
+    this.description = '',
+    this.isDone = false,
+    required this.category,
+    required this.priority,
+  });
+}
+
+/* =======================
+   TODO PAGE
+======================= */
+class TodoPage extends StatefulWidget {
+  const TodoPage({super.key});
+
+  @override
+  State<TodoPage> createState() => _TodoPageState();
+}
+
+class _TodoPageState extends State<TodoPage> {
+  final List<Todo> _todos = []; // Main list of tasks
+
+  final _titleController = TextEditingController(); // For editing/adding title
+  final _descController = TextEditingController(); // For description
+
+  String _selectedCategory = 'Study'; // Default category
+  Priority _selectedPriority = Priority.medium; // Default priority
+
+  // Helper: filter tasks by category
+  List<Todo> _tasksFor(String c) =>
+      _todos.where((t) => t.category == c).toList();
+
+  // Assign a color to each priority
+  Color _priorityColor(Priority p) {
+    switch (p) {
+      case Priority.high:
+        return Colors.red;
+      case Priority.medium:
+        return Colors.orange;
+      case Priority.low:
+        return Colors.green;
+    }
+  }
+
+  // Delete a task with undo via snackbar
+  void _deleteTask(Todo todo) {
+    final index = _todos.indexOf(todo); // Keep position for undo
+
+    setState(() {
+      _todos.removeAt(index);
+    });
+
+    // Show snackbar with undo
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Task deleted'),
+        action: SnackBarAction(
+          label: 'UNDO',
+          onPressed: () {
+            setState(() {
+              _todos.insert(index, todo);
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  // Dialog for adding or editing a task
+  void _showTaskDialog({Todo? todo}) {
+    final editing = todo != null;
+
+    if (editing) {
+      // Pre-fill fields when editing
+      _titleController.text = todo.title;
+      _descController.text = todo.description;
+      _selectedCategory = todo.category;
+      _selectedPriority = todo.priority;
+    } else {
+      // Reset fields when adding new
+      _titleController.clear();
+      _descController.clear();
+      _selectedCategory = 'Study';
+      _selectedPriority = Priority.medium;
+    }
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(editing ? 'Edit Task' : 'Add Task'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Title input
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            // Description input
+            TextField(
+              controller: _descController,
+              maxLines: 3,
+              decoration:
+                  const InputDecoration(labelText: 'Description'),
+            ),
+            // Category dropdown
+            DropdownButton<String>(
+              value: _selectedCategory,
+              isExpanded: true,
+              items: ['Work', 'Study', 'Personal']
+                  .map((c) =>
+                      DropdownMenuItem(value: c, child: Text(c)))
+                  .toList(),
+              onChanged: (v) =>
+                  setState(() => _selectedCategory = v!),
+            ),
+            // Priority dropdown
+            DropdownButton<Priority>(
+              value: _selectedPriority,
+              isExpanded: true,
+              items: Priority.values
+                  .map((p) => DropdownMenuItem(
+                        value: p,
+                        child: Text(p.name.toUpperCase()),
+                      ))
+                  .toList(),
+              onChanged: (v) =>
+                  setState(() => _selectedPriority = v!),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              if (_titleController.text.isEmpty) return;
+
+              setState(() {
+                if (editing) {
+                  // Update existing task
+                  todo.title = _titleController.text;
+                  todo.description = _descController.text;
+                  todo.category = _selectedCategory;
+                  todo.priority = _selectedPriority;
+                } else {
+                  // Add new task
+                  _todos.add(Todo(
+                    title: _titleController.text,
+                    description: _descController.text,
+                    category: _selectedCategory,
+                    priority: _selectedPriority,
+                  ));
+                }
+              });
+
+              Navigator.pop(context);
+            },
+            child: Text(editing ? 'Save' : 'Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Your Tasks')),
+      body: ListView(
+        children: ['Work', 'Study', 'Personal']
+            .where((c) => _tasksFor(c).isNotEmpty)
+            .map(
+              (c) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Category header
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      c.toUpperCase(),
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  // Tasks under this category
+                  ..._tasksFor(c).map(
+                    (t) => Card(
+                      child: ListTile(
+                        leading: Icon(Icons.circle,
+                            size: 12,
+                            color: _priorityColor(t.priority)),
+                        title: Text(
+                          t.title,
+                          style: TextStyle(
+                            decoration: t.isDone
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        subtitle: t.description.isNotEmpty
+                            ? Text(t.description)
+                            : null,
+                        // Checkbox to mark task complete
+                        trailing: Checkbox(
+                          value: t.isDone,
+                          onChanged: (v) =>
+                              setState(() => t.isDone = v!),
+                        ),
+                        // Tap to edit
+                        onTap: () => _showTaskDialog(todo: t),
+                        // Long press to delete
+                        onLongPress: () => _deleteTask(t),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+            .toList(),
+      ),
+      // Floating button to add a new task
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showTaskDialog(),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
 
