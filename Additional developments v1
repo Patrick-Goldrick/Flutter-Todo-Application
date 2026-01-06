@@ -1,0 +1,268 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'To-Do Tracker',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: const TodoPage(),
+    );
+  }
+}
+
+/* =======================
+   DATA MODEL
+======================= */
+
+enum Priority { low, medium, high }
+
+class Todo {
+  String title;
+  bool isDone;
+  String category;
+  Priority priority;
+
+  Todo({
+    required this.title,
+    this.isDone = false,
+    required this.category,
+    required this.priority,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'isDone': isDone,
+        'category': category,
+        'priority': priority.index,
+      };
+
+  factory Todo.fromJson(Map<String, dynamic> json) => Todo(
+        title: json['title'],
+        isDone: json['isDone'],
+        category: json['category'],
+        priority: Priority.values[json['priority']],
+      );
+}
+
+/* =======================
+   MAIN PAGE
+======================= */
+
+class TodoPage extends StatefulWidget {
+  const TodoPage({super.key});
+
+  @override
+  State<TodoPage> createState() => _TodoPageState();
+}
+
+class _TodoPageState extends State<TodoPage> {
+  final List<Todo> _todos = [];
+  final TextEditingController _titleController = TextEditingController();
+
+  String _selectedCategory = 'Study';
+  Priority _selectedPriority = Priority.medium;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTodos();
+  }
+
+  /* =======================
+     PERSISTENCE
+  ======================= */
+
+  Future<void> _saveTodos() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data =
+        _todos.map((todo) => jsonEncode(todo.toJson())).toList();
+    prefs.setStringList('todos', data);
+  }
+
+  Future<void> _loadTodos() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getStringList('todos');
+
+    if (data != null) {
+      setState(() {
+        _todos.clear();
+        _todos.addAll(
+          data.map((item) => Todo.fromJson(jsonDecode(item))),
+        );
+      });
+    }
+  }
+
+  /* =======================
+     HELPERS
+  ======================= */
+
+  Color _priorityColor(Priority p) {
+    switch (p) {
+      case Priority.high:
+        return Colors.red;
+      case Priority.medium:
+        return Colors.orange;
+      case Priority.low:
+        return Colors.green;
+    }
+  }
+
+  void _addTodo() {
+    if (_titleController.text.isEmpty) return;
+
+    setState(() {
+      _todos.add(
+        Todo(
+          title: _titleController.text,
+          category: _selectedCategory,
+          priority: _selectedPriority,
+        ),
+      );
+    });
+
+    _titleController.clear();
+    _saveTodos();
+    Navigator.pop(context);
+  }
+
+  /* =======================
+     ADD TASK DIALOG
+  ======================= */
+
+  void _showAddDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Task'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration:
+                  const InputDecoration(labelText: 'Task title'),
+            ),
+            const SizedBox(height: 10),
+            DropdownButton<String>(
+              value: _selectedCategory,
+              isExpanded: true,
+              items: ['Study', 'Work', 'Personal']
+                  .map(
+                    (cat) => DropdownMenuItem(
+                      value: cat,
+                      child: Text(cat),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedCategory = value!;
+                });
+              },
+            ),
+            const SizedBox(height: 10),
+            DropdownButton<Priority>(
+              value: _selectedPriority,
+              isExpanded: true,
+              items: Priority.values
+                  .map(
+                    (p) => DropdownMenuItem(
+                      value: p,
+                      child: Text(p.name.toUpperCase()),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedPriority = value!;
+                });
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: _addTodo,
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /* =======================
+     UI
+  ======================= */
+
+  @override
+  Widget build(BuildContext context) {
+    final completed =
+        _todos.where((todo) => todo.isDone).length;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('To-Do Tracker ($completed/${_todos.length})'),
+      ),
+      body: _todos.isEmpty
+          ? const Center(
+              child: Text('No tasks yet. Tap + to add one.'),
+            )
+          : ListView.builder(
+              itemCount: _todos.length,
+              itemBuilder: (context, index) {
+                final todo = _todos[index];
+
+                return ListTile(
+                  leading: Icon(
+                    Icons.circle,
+                    size: 12,
+                    color: _priorityColor(todo.priority),
+                  ),
+                  title: Text(
+                    todo.title,
+                    style: TextStyle(
+                      decoration: todo.isDone
+                          ? TextDecoration.lineThrough
+                          : null,
+                    ),
+                  ),
+                  subtitle: Text(todo.category),
+                  trailing: Checkbox(
+                    value: todo.isDone,
+                    onChanged: (value) {
+                      setState(() {
+                        todo.isDone = value!;
+                      });
+                      _saveTodos();
+                    },
+                  ),
+                  onLongPress: () {
+                    setState(() {
+                      _todos.removeAt(index);
+                    });
+                    _saveTodos();
+                  },
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddDialog,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
