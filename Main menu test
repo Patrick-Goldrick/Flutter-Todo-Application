@@ -1,0 +1,79 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'To-Do Tracker',
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const StartScreen(),
+        '/todos': (context) => const TodoScreen(),
+      },
+    );
+  }
+}
+
+/* =======================
+   START SCREEN
+======================= */
+
+class StartScreen extends StatelessWidget {
+  const StartScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'START SCREEN',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, '/todos');
+              },
+              child: const Text('Start'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/* =======================
+   TODO SCREEN (TEMP)
+======================= */
+
+class TodoScreen extends StatelessWidget {
+  const TodoScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('To-Do Screen')),
+      body: const Center(
+        child: Text(
+          'TODO APP GOES HERE',
+          style: TextStyle(fontSize: 24),
+        ),
+      ),
+    );
+  }
+}
