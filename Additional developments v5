@@ -1,0 +1,326 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+/* =======================
+   APP ROOT
+======================= */
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'To-Do Tracker',
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const StartScreen(),
+        '/todos': (context) => const TodoPage(),
+      },
+    );
+  }
+}
+
+/* =======================
+   START SCREEN
+======================= */
+
+class StartScreen extends StatelessWidget {
+  const StartScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle_outline,
+                size: 100, color: Colors.white),
+            const SizedBox(height: 20),
+            const Text(
+              'To-Do Tracker',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, '/todos');
+              },
+              child: const Text('Start'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/* =======================
+   DATA MODEL
+======================= */
+
+enum Priority { low, medium, high }
+
+class Todo {
+  String title;
+  String description;
+  bool isDone;
+  String category;
+  Priority priority;
+
+  Todo({
+    required this.title,
+    this.description = '',
+    this.isDone = false,
+    required this.category,
+    required this.priority,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'description': description,
+        'isDone': isDone,
+        'category': category,
+        'priority': priority.index,
+      };
+
+  factory Todo.fromJson(Map<String, dynamic> json) => Todo(
+        title: json['title'],
+        description: json['description'] ?? '',
+        isDone: json['isDone'],
+        category: json['category'],
+        priority: Priority.values[json['priority']],
+      );
+}
+
+/* =======================
+   TODO PAGE
+======================= */
+
+class TodoPage extends StatefulWidget {
+  const TodoPage({super.key});
+
+  @override
+  State<TodoPage> createState() => _TodoPageState();
+}
+
+class _TodoPageState extends State<TodoPage> {
+  final List<Todo> _todos = [];
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descController = TextEditingController();
+
+  String _selectedCategory = 'Study';
+  Priority _selectedPriority = Priority.medium;
+
+  final Map<String, int> _categoryOrder = {
+    'Work': 0,
+    'Study': 1,
+    'Personal': 2,
+  };
+
+  Todo? _lastDeleted;
+  int? _lastDeletedIndex;
+
+  /* ---------- Helpers ---------- */
+
+  void _sortTodos() {
+    _todos.sort((a, b) =>
+        _categoryOrder[a.category]!.compareTo(_categoryOrder[b.category]!));
+  }
+
+  Color _priorityColor(Priority p) {
+    switch (p) {
+      case Priority.high:
+        return Colors.red;
+      case Priority.medium:
+        return Colors.orange;
+      case Priority.low:
+        return Colors.green;
+    }
+  }
+
+  Color _categoryColor(String c) {
+    switch (c) {
+      case 'Work':
+        return Colors.purple;
+      case 'Study':
+        return Colors.blue;
+      case 'Personal':
+        return Colors.teal;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  /* ---------- Actions ---------- */
+
+  void _addTodo() {
+    if (_titleController.text.isEmpty) return;
+
+    setState(() {
+      _todos.add(Todo(
+        title: _titleController.text,
+        description: _descController.text,
+        category: _selectedCategory,
+        priority: _selectedPriority,
+      ));
+      _sortTodos();
+    });
+
+    _titleController.clear();
+    _descController.clear();
+    Navigator.pop(context);
+  }
+
+  void _deleteTodo(int index) {
+    setState(() {
+      _lastDeleted = _todos[index];
+      _lastDeletedIndex = index;
+      _todos.removeAt(index);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Task deleted'),
+        action: SnackBarAction(
+          label: 'UNDO',
+          onPressed: () {
+            setState(() {
+              _todos.insert(_lastDeletedIndex!, _lastDeleted!);
+              _sortTodos();
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  void _clearCompleted() {
+    setState(() {
+      _todos.removeWhere((t) => t.isDone);
+    });
+  }
+
+  /* ---------- Dialog ---------- */
+
+  void _showAddDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Add Task'),
+        content: SingleChildScrollView(
+          child: Column(
+            children: [
+              TextField(
+                controller: _titleController,
+                decoration:
+                    const InputDecoration(labelText: 'Task title'),
+              ),
+              TextField(
+                controller: _descController,
+                maxLines: 3,
+                decoration:
+                    const InputDecoration(labelText: 'Description'),
+              ),
+              DropdownButton<String>(
+                value: _selectedCategory,
+                isExpanded: true,
+                items: ['Work', 'Study', 'Personal']
+                    .map((c) =>
+                        DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedCategory = v!),
+              ),
+              DropdownButton<Priority>(
+                value: _selectedPriority,
+                isExpanded: true,
+                items: Priority.values
+                    .map((p) => DropdownMenuItem(
+                          value: p,
+                          child: Text(p.name.toUpperCase()),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedPriority = v!),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          ElevatedButton(onPressed: _addTodo, child: const Text('Add')),
+        ],
+      ),
+    );
+  }
+
+  /* ---------- UI ---------- */
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Your Tasks'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            onPressed: _clearCompleted,
+          ),
+        ],
+      ),
+      body: _todos.isEmpty
+          ? const Center(child: Text('No tasks yet'))
+          : ListView.builder(
+              itemCount: _todos.length,
+              itemBuilder: (context, i) {
+                final t = _todos[i];
+                return Card(
+                  child: ListTile(
+                    leading: Icon(Icons.circle,
+                        size: 12, color: _priorityColor(t.priority)),
+                    title: Text(
+                      t.title,
+                      style: TextStyle(
+                          decoration: t.isDone
+                              ? TextDecoration.lineThrough
+                              : null),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (t.description.isNotEmpty) Text(t.description),
+                        Chip(
+                          label: Text(t.category),
+                          backgroundColor:
+                              _categoryColor(t.category).withOpacity(0.2),
+                        ),
+                      ],
+                    ),
+                    trailing: Checkbox(
+                      value: t.isDone,
+                      onChanged: (v) =>
+                          setState(() => t.isDone = v!),
+                    ),
+                    onLongPress: () => _deleteTodo(i),
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddDialog,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
