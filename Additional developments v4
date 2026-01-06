@@ -1,0 +1,382 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'To-Do Tracker',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: const TodoPage(),
+    );
+  }
+}
+
+/* =======================
+   DATA MODEL
+======================= */
+
+enum Priority { low, medium, high }
+
+class Todo {
+  String title;
+  String description;
+  bool isDone;
+  String category;
+  Priority priority;
+
+  Todo({
+    required this.title,
+    this.description = '',
+    this.isDone = false,
+    required this.category,
+    required this.priority,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'description': description,
+        'isDone': isDone,
+        'category': category,
+        'priority': priority.index,
+      };
+
+  factory Todo.fromJson(Map<String, dynamic> json) => Todo(
+        title: json['title'],
+        description: json['description'] ?? '',
+        isDone: json['isDone'],
+        category: json['category'],
+        priority: Priority.values[json['priority']],
+      );
+}
+
+/* =======================
+   MAIN PAGE
+======================= */
+
+class TodoPage extends StatefulWidget {
+  const TodoPage({super.key});
+
+  @override
+  State<TodoPage> createState() => _TodoPageState();
+}
+
+class _TodoPageState extends State<TodoPage> {
+  final List<Todo> _todos = [];
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descController = TextEditingController();
+
+  String _selectedCategory = 'Study';
+  Priority _selectedPriority = Priority.medium;
+
+  final Map<String, int> _categoryOrder = {
+    'Work': 0,
+    'Study': 1,
+    'Personal': 2,
+  };
+
+  Todo? _lastDeletedTodo;
+  int? _lastDeletedIndex;
+
+  // In-memory storage as a web-safe replacement
+  List<String> _storedTodos = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTodos();
+  }
+
+  /* ---------- Persistence Replacement ---------- */
+
+  void _saveTodos() {
+    // Save to in-memory storage for web-safe testing
+    _storedTodos = _todos.map((todo) => jsonEncode(todo.toJson())).toList();
+  }
+
+  void _loadTodos() {
+    _todos.clear();
+    _todos.addAll(_storedTodos.map((item) => Todo.fromJson(jsonDecode(item))));
+    _sortTodos();
+  }
+
+  /* ---------- Helpers ---------- */
+
+  void _sortTodos() {
+    _todos.sort((a, b) =>
+        _categoryOrder[a.category]!.compareTo(_categoryOrder[b.category]!));
+  }
+
+  Color _priorityColor(Priority p) {
+    switch (p) {
+      case Priority.high:
+        return Colors.red;
+      case Priority.medium:
+        return Colors.orange;
+      case Priority.low:
+        return Colors.green;
+    }
+  }
+
+  Color _categoryColor(String category) {
+    switch (category) {
+      case 'Work':
+        return Colors.purple;
+      case 'Study':
+        return Colors.blue;
+      case 'Personal':
+        return Colors.teal;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  void _showUndoSnackBar(BuildContext context) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Task deleted'),
+        action: SnackBarAction(
+          label: 'UNDO',
+          onPressed: () {
+            if (_lastDeletedTodo != null && _lastDeletedIndex != null) {
+              setState(() {
+                _todos.insert(_lastDeletedIndex!, _lastDeletedTodo!);
+                _sortTodos();
+              });
+              _saveTodos();
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  /* ---------- Actions ---------- */
+
+  void _addTodo() {
+    if (_titleController.text.isEmpty) return;
+
+    setState(() {
+      _todos.add(
+        Todo(
+          title: _titleController.text,
+          description: _descController.text,
+          category: _selectedCategory,
+          priority: _selectedPriority,
+        ),
+      );
+      _sortTodos();
+    });
+
+    _titleController.clear();
+    _descController.clear();
+    _saveTodos();
+    Navigator.pop(context);
+  }
+
+  void _deleteTodo(int index, BuildContext context) {
+    setState(() {
+      _lastDeletedTodo = _todos[index];
+      _lastDeletedIndex = index;
+      _todos.removeAt(index);
+    });
+    _saveTodos();
+    _showUndoSnackBar(context);
+  }
+
+  void _clearCompleted(BuildContext context) {
+    final completed = _todos.where((todo) => todo.isDone).toList();
+    if (completed.isEmpty) return;
+
+    setState(() {
+      _lastDeletedTodo = null;
+      _lastDeletedIndex = null;
+      _todos.removeWhere((todo) => todo.isDone);
+      _sortTodos();
+    });
+    _saveTodos();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Completed tasks cleared')),
+    );
+  }
+
+  /* ---------- Add Task Dialog ---------- */
+
+  void _showAddDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Add Task'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _titleController,
+                decoration: const InputDecoration(labelText: 'Task title'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _descController,
+                decoration:
+                    const InputDecoration(labelText: 'Description (optional)'),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 10),
+              DropdownButton<String>(
+                value: _selectedCategory,
+                isExpanded: true,
+                items: ['Work', 'Study', 'Personal']
+                    .map((cat) => DropdownMenuItem(
+                          value: cat,
+                          child: Text(cat),
+                        ))
+                    .toList(),
+                onChanged: (value) {
+                  setState(() => _selectedCategory = value!);
+                },
+              ),
+              const SizedBox(height: 10),
+              DropdownButton<Priority>(
+                value: _selectedPriority,
+                isExpanded: true,
+                items: Priority.values
+                    .map((p) => DropdownMenuItem(
+                          value: p,
+                          child: Text(p.name.toUpperCase()),
+                        ))
+                    .toList(),
+                onChanged: (value) {
+                  setState(() => _selectedPriority = value!);
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          ElevatedButton(onPressed: _addTodo, child: const Text('Add')),
+        ],
+      ),
+    );
+  }
+
+  /* ---------- UI ---------- */
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = _todos.where((todo) => todo.isDone).length;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('To-Do Tracker ($completed/${_todos.length})'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            tooltip: 'Clear completed tasks',
+            onPressed:
+                completed == 0 ? null : () => _clearCompleted(context),
+          ),
+        ],
+      ),
+      body: _todos.isEmpty
+          ? const Center(
+              child: Text('No tasks yet. Tap + to add one.'),
+            )
+          : ListView.builder(
+              itemCount: _todos.length,
+              itemBuilder: (context, index) {
+                final todo = _todos[index];
+
+                return Card(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.circle,
+                      size: 12,
+                      color: _priorityColor(todo.priority),
+                    ),
+                    title: Text(
+                      todo.title,
+                      style: TextStyle(
+                          decoration: todo.isDone
+                              ? TextDecoration.lineThrough
+                              : null),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color:
+                                _categoryColor(todo.category).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _categoryColor(todo.category),
+                            ),
+                          ),
+                          child: Text(
+                            todo.category,
+                            style: TextStyle(
+                              color: _categoryColor(todo.category),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        if (todo.description.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              todo.description,
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey),
+                            ),
+                          ),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Checkbox(
+                          value: todo.isDone,
+                          onChanged: (value) {
+                            setState(() {
+                              todo.isDone = value!;
+                            });
+                            _saveTodos();
+                          },
+                        ),
+                        if (todo.isDone)
+                          IconButton(
+                            icon:
+                                const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _deleteTodo(index, context),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddDialog,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
